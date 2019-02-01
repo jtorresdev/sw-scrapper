@@ -21,7 +21,18 @@ function subStrAfterChars(str, char, pos) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  let visits_string = $(
+  /* Obtenemos JSON con informacion */
+  var script_code = $('script:contains("Sw.preloadedData")').html();
+  var start = script_code.indexOf("Sw.preloadedData");
+  var end = script_code.indexOf("Sw.period");
+
+  var data = JSON.parse(
+    script_code.slice(start + "Sw.preloadedData =".length, end).replace(";", "")
+  );
+
+  /* Obtenemos visitas para calcular paginas vistas */
+
+  /*let visits_string = $(
     $(".engagementInfo-valueNumber.js-countValue")[0]
   ).text();
   const page_views_prom = $(
@@ -64,110 +75,85 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  const total_page_views = visits * page_views_prom;
+  const total_pages_views = visits * page_views_prom;*/
+
+  let total_visits = data.overview.EngagementsSimilarweb.TotalLastMonthVisits;
+  let page_views = data.overview.EngagementsSimilarweb.PageViews.toFixed(2);
+
+  /* Ranking paises */
 
   let countries = [];
-  let traffic_sources = [];
 
-  countries_arr = $(".traffic-share-valueNumber.js-countValue");
+  countries_arr = data.overview.TopCountryShares;
 
   for (let i = 0; i < countries_arr.length; i++) {
-    let pages_views =
-      ($(countries_arr[i])
-        .text()
-        .replace("%", "") /
-        100) *
-      total_page_views;
-    country_name = $($(".country-name")[i]).text();
-    countries.push({ pages_views, country_name });
+    let visits_perc = (countries_arr[i][1] * 100).toFixed(2);
+    let name = $($(".country-name")[i]).text();
+    let code = countries_arr[i][0];
+    countries.push({ visits_perc, name, code });
   }
 
-  const global_rank = $(
-    $(".websiteRanks-valueContainer.js-websiteRanksValue")[0]
-  )
-    .text()
-    .replace(/(\r\n\t|\n|\r\t)/gm, "")
-    .replace(/ /g, "");
-  const country_rank = $(
-    $(".websiteRanks-valueContainer.js-websiteRanksValue")[1]
-  )
-    .text()
-    .replace(/(\r\n\t|\n|\r\t)/gm, "")
-    .replace(/ /g, "");
+  /* Ranking global */
+
+  const global_rank = data.overview.GlobalRank[0];
+
+  const country_rank = data.overview.CountryRanks[data.overview.Country][0];
+
+  const country_name = $(
+    ".websiteRanks-item.js-countryRank > .websiteRanks-header > .websiteRanks-name > a.websiteRanks-nameText"
+  ).text();
+
+  const country_code = data.overview.Country;
+
+  /* Categoria y subcategoria */
 
   let category;
   let subcategory;
 
-  if (
-    $($(".websiteRanks-nameText")[2])
-      .text()
-      .indexOf(">") >= 0
-  ) {
-    let categories = $($(".websiteRanks-nameText")[2])
-      .text()
-      .split(">");
+  if (data.overview.Category.indexOf("/") >= 0) {
+    let categories = data.overview.Category.split("/");
 
-    category = categories[0];
-    subcategory = categories[1].replace(/ /g, "");
+    category = categories[0].replace(/_/g, " ");
+    subcategory = categories[1].replace(/_/g, " ");
   } else {
-    category = $($(".websiteRanks-nameText")[2]).text();
+    category = data.overview.Category.replace(/_/g, " ");
     subcategory = null;
   }
 
-  let traffic_sources_arr = $(".trafficSourcesChart-title");
-  for (let i = 0; i < 4; i++) {
-    traffic_sources_name = $(traffic_sources_arr[i])
-      .text()
-      .replace(/(\r\n\t|\n|\r\t)/gm, "")
-      .replace(/ /g, "");
-    traffic_sources_perc = $($(".trafficSourcesChart-value")[i]).text();
+  /* Fuentes de trafico */
+
+  let traffic_sources = [];
+
+  const traffic_sources_obj = data.overview.TrafficSources;
+
+  for (const source in traffic_sources_obj) {
+    traffic_sources_name = source;
+    traffic_sources_perc = (traffic_sources_obj[source] * 100).toFixed(2);
     traffic_sources.push({ traffic_sources_name, traffic_sources_perc });
   }
 
-  let adsense_ok = false;
+  const date = data.overview.Date;
 
-  if ($('h2:contains("NO DISPLAY ADVERTISING")').length >= 1) {
-    ipcRenderer.send("html-dom", {
-      total_page_views,
-      countries,
-      global_rank,
-      country_rank,
-      category,
-      subcategory,
-      traffic_sources,
-      adsense_ok
-    });
-  } else {
-    waitForEl('.highcharts-container', function() {
-      if ($('span:contains("Google Display Network")').length >= 1) {
-        adsense_ok = true;
-      }else{
-        adsense_ok = false;
-      }
-      ipcRenderer.send("html-dom", {
-        total_page_views,
-        countries,
-        global_rank,
-        country_rank,
-        category,
-        subcategory,
-        traffic_sources,
-        adsense_ok
-      });
-    });
+  /* Verificamos si tiene adsense */
+
+  let adsense = false;
+
+  if ($("script:contains('Google Display Network')").length >= 1) {
+    adsense = true;
   }
 
-  /*
-    
-    {
-      total_page_views,
-      countries,
-      global_rank,
-      country_rank,
-      category,
-      subcategory,
-      traffic_sources,
-      adsense_ok
-    }
-    */
+  ipcRenderer.send("html-dom", {
+    date,
+    total_visits,
+    page_views,
+    countries,
+    global_rank,
+    country_rank,
+    country_name,
+    country_code,
+    category,
+    subcategory,
+    traffic_sources,
+    adsense
+  });
 });

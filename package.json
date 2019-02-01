@@ -2,6 +2,9 @@
   "dependencies": {
     "electron": "^4.0.1",
     "headless-chrome-crawler": "^1.8.0",
+    "i18n-iso-countries": "^3.7.8",
+    "mongoose": "^5.4.8",
+    "mysql": "^2.16.0",
     "scavenger": "^3.3.0",
     "scrapman": "^2.3.1"
   },
